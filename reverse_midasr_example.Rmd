@@ -1,0 +1,74 @@
+---
+title: "Reverse MIDAS with midasr"
+output: html_notebook
+---
+
+Here is an example of doing reverse MIDAS model. 
+
+Let us load some example data.
+
+```{r}
+library(midasr)
+data("USrealgdp")
+data("USunempr")
+
+y.ar <- diff(log(USrealgdp))
+xx <- window(diff(USunempr), start = 1949)
+trend <- 1:length(y.ar)
+```
+
+We will be fitting a non-sensical model of modelling the change of US unemployment in the month of December with the changes of months from January to November and previous years of US GDP growth.
+
+```{r}
+mr <- midas_r(mls(xx,1,12)~mls(y.ar, 1:2, 1)+mls(xx,2:11, 12), data=list(y.ar=y.ar, xx=xx), start = NULL)
+mr
+```
+
+
+Let us inspect what time series form the part of the model:
+
+```{r}
+mr$model[1:5, ]
+```
+
+Let us inspect the first years of the data
+
+```{r}
+window(xx, start = c(1951,1), end = c(1951,12))
+```
+
+Compare it with the first row of the model matrix and you will see that the values in columns `mls(xx, 2:11, 12)X.2/m` to `mls(xx, 2:11, 12)X.11/m` correspond to the values of months November to January of the year 1951. 
+
+The sample starts from the year 1949, but we lose 2 years because we use two lags of the yearly data.
+
+Here is the low frequency variable
+```{r}
+window(y.ar, start=c(1949), end = c(1951))
+```
+
+You can see that the values in the first row of the columns `mls(y.ar, 1:2, 1)X.1/m` and `mls(y.ar, 1:2, 1)X.2/m` correspond to years 1950 and 1949 of the low frequency variable.
+
+
+Let us inspect model we fit
+```{r}
+summary(mr)
+```
+
+As you can see the cofficients for GDP lags are not significant, which is not entirely surprising.
+
+We can try to impose some lag structure on the monthly data:
+
+```{r}
+mr1 <- midas_r(mls(xx,1,12)~mls(y.ar, 1:2, 1)+mls(xx,2:11, 12, nealmon), data=list(y.ar=y.ar, xx=xx), start = list(xx = c(1,0)))
+mr1
+```
+
+Let us inspect the fit
+```{r}
+summary(mr1)
+```
+
+The fit is slightly worse because the restriction is not very good.  As can be seen from the coefficients: 
+```{r}
+plot_midas_coef(mr1)
+```
