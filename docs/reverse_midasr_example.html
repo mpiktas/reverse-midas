@@ -133,29 +133,34 @@ x_{tm+h} = \mu+\sum_{j=0}^{p_Y}\mu_jy_{t-j}+\sum_{j=0}^{p_X}\beta_{j}x_{tm-j}+\v
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(midasr)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(quantmod)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>usqgdp <span class="ot">&lt;-</span>  <span class="fu">getSymbols</span>(<span class="st">"GDP"</span>,<span class="at">src=</span><span class="st">"FRED"</span>,<span class="at">auto.assign=</span><span class="cn">FALSE</span>)</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>infl <span class="ot">&lt;-</span> <span class="fu">getSymbols</span>(<span class="st">"CPALTT01USM659N"</span>,<span class="at">src=</span><span class="st">"FRED"</span>,<span class="at">auto.assign=</span><span class="cn">FALSE</span>)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>usqgdp <span class="ot">&lt;-</span> usqgdp[<span class="st">"/2022-04-01"</span>,]</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>infl <span class="ot">&lt;-</span> infl[<span class="st">"/2022-06-01"</span>]</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>gdpg <span class="ot">&lt;-</span> <span class="fu">diff</span>(<span class="fu">log</span>(usqgdp))<span class="sc">*</span><span class="dv">100</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(lubridate)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>usqgdp <span class="ot">&lt;-</span>  <span class="fu">getSymbols</span>(<span class="st">"GDP"</span>,<span class="at">src=</span><span class="st">"FRED"</span>,<span class="at">auto.assign=</span><span class="cn">FALSE</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>infl <span class="ot">&lt;-</span> <span class="fu">getSymbols</span>(<span class="st">"CPALTT01USM659N"</span>,<span class="at">src=</span><span class="st">"FRED"</span>,<span class="at">auto.assign=</span><span class="cn">FALSE</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>usqgdp <span class="ot">&lt;-</span> usqgdp[<span class="st">"/2022-04-01"</span>,]</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>infl <span class="ot">&lt;-</span> infl[<span class="st">"/2022-06-01"</span>]</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>gdpg <span class="ot">&lt;-</span> <span class="fu">diff</span>(<span class="fu">log</span>(usqgdp))<span class="sc">*</span><span class="dv">100</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>We are fitting a model which forecasts the inflation of the first month of the quarter using previous quarter GDP growth. The frequency aligning is done using function <code>mlsd</code>, which uses date information available from <code>gdpg</code> and <code>infl</code>. These to variables are <code>xts</code> objects.</p>
+<p>We are fitting a model which forecasts the inflation of the first month of the quarter using previous quarter GDP growth. The frequency aligning is done using function <code>mlsd</code>, which uses date information available from <code>gdpg</code> and <code>infl</code>. These two variables are <code>xts</code> objects.</p>
+<p>In our case for the model specification we have <span class="math inline">\(h=1\)</span>, <span class="math inline">\(p_Y = 3\)</span> and <span class="math inline">\(p_X = 8\)</span>. This means that we are using 3 previous quarters of GDP growth and 9 months of inflation data.</p>
+<p>The package midasr uses convention that the low frequency variable is observed at the end of the low frequency period, so the high frequency values at the current low frequency period are always lagged. The first month of the quarter is then 2 high frequency lags “behind”.</p>
+<p>All model specifications in midasr package assumes that the left hand side variable is observed at the low frequency period <span class="math inline">\(t\)</span>. For <span class="math inline">\(h=1\)</span> the left hand side is observed at low frequency period <span class="math inline">\(t+1\)</span>, so to specify the model in midasr package we need to lag all the variables by one low frequency period, or 3 high frequency periods (one quarter is equal to 3 months).</p>
+<p>Finally we arrive to the following specification:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>mr <span class="ot">&lt;-</span> <span class="fu">midas_r</span>(<span class="fu">mlsd</span>(infl,<span class="dv">2</span>,gdpg)<span class="sc">~</span><span class="fu">mlsd</span>(gdpg, <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, gdpg)<span class="sc">+</span><span class="fu">mlsd</span>(infl,<span class="dv">3</span><span class="sc">+</span><span class="dv">0</span><span class="sc">:</span><span class="dv">11</span>, gdpg), <span class="at">data=</span><span class="fu">list</span>(<span class="at">gdpg=</span>gdpg, <span class="at">infl=</span>infl), <span class="at">start =</span> <span class="cn">NULL</span>)</span>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>mr <span class="ot">&lt;-</span> <span class="fu">midas_r</span>(<span class="fu">mlsd</span>(infl,<span class="dv">2</span>,gdpg)<span class="sc">~</span><span class="fu">mlsd</span>(gdpg, <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, gdpg)<span class="sc">+</span><span class="fu">mlsd</span>(infl,<span class="dv">3</span><span class="sc">+</span><span class="dv">0</span><span class="sc">:</span><span class="dv">8</span>, gdpg), <span class="at">data=</span><span class="fu">list</span>(<span class="at">gdpg=</span>gdpg, <span class="at">infl=</span>infl), <span class="at">start =</span> <span class="cn">NULL</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>mr</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 MIDAS regression model with "numeric" data:
-Start = 57, End = 302
- model: mlsd(infl, 2, gdpg) ~ mlsd(gdpg, 1:3, gdpg) + mlsd(infl, 3 +      0:11, gdpg) 
+Start = 56, End = 302
+ model: mlsd(infl, 2, gdpg) ~ mlsd(gdpg, 1:3, gdpg) + mlsd(infl, 3 +      0:8, gdpg) 
 (Intercept)       gdpg1       gdpg2       gdpg3       infl1       infl2 
-   -0.03025     0.02397     0.03639     0.04949     1.28237    -0.27839 
+   -0.03919     0.02315     0.03041     0.06282     1.27659    -0.27883 
       infl3       infl4       infl5       infl6       infl7       infl8 
-   -0.20976     0.24882    -0.04254    -0.07836     0.21885    -0.19394 
-      infl9      infl10      infl11      infl12 
-    0.13788    -0.03804    -0.15507     0.07258 
+   -0.19871     0.22796    -0.02450    -0.09063     0.22257    -0.13683 
+      infl9 
+   -0.03304 
 
 Function lm was used for fitting</code></pre>
 </div>
@@ -169,41 +174,31 @@ Function lm was used for fitting</code></pre>
 301 6.221869           1                 2.008565                 3.138917
 302 7.479872           1                 3.391781                 2.008565
 303 8.258629           1                 1.586818                 3.391781
-    mlsd(gdpg, 1:3, gdpg)X.3 mlsd(infl, 3 + 0:11, gdpg)X.3
-300                 1.591087                      5.391451
-301                 2.576810                      5.390349
-302                 3.138917                      7.036403
-303                 2.008565                      8.542456
-    mlsd(infl, 3 + 0:11, gdpg)X.4 mlsd(infl, 3 + 0:11, gdpg)X.5
-300                      4.992707                      4.159695
-301                      5.251272                      5.365475
-302                      6.809003                      6.221869
-303                      7.871064                      7.479872
-    mlsd(infl, 3 + 0:11, gdpg)X.6 mlsd(infl, 3 + 0:11, gdpg)X.7
-300                      2.619763                      1.676215
-301                      5.391451                      4.992707
-302                      5.390349                      5.251272
-303                      7.036403                      6.809003
-    mlsd(infl, 3 + 0:11, gdpg)X.8 mlsd(infl, 3 + 0:11, gdpg)X.9
-300                      1.399770                      1.362005
-301                      4.159695                      2.619763
-302                      5.365475                      5.391451
-303                      6.221869                      5.390349
-    mlsd(infl, 3 + 0:11, gdpg)X.10 mlsd(infl, 3 + 0:11, gdpg)X.11
-300                       1.174536                       1.182066
-301                       1.676215                       1.399770
-302                       4.992707                       4.159695
-303                       5.251272                       5.365475
-    mlsd(infl, 3 + 0:11, gdpg)X.12 mlsd(infl, 3 + 0:11, gdpg)X.13
-300                       1.371325                       1.309645
-301                       1.362005                       1.174536
-302                       2.619763                       1.676215
-303                       5.391451                       4.992707
-    mlsd(infl, 3 + 0:11, gdpg)X.14
-300                      0.9860818
-301                      1.1820662
-302                      1.3997697
-303                      4.1596948</code></pre>
+    mlsd(gdpg, 1:3, gdpg)X.3 mlsd(infl, 3 + 0:8, gdpg)X.3
+300                 1.591087                     5.391451
+301                 2.576810                     5.390349
+302                 3.138917                     7.036403
+303                 2.008565                     8.542456
+    mlsd(infl, 3 + 0:8, gdpg)X.4 mlsd(infl, 3 + 0:8, gdpg)X.5
+300                     4.992707                     4.159695
+301                     5.251272                     5.365475
+302                     6.809003                     6.221869
+303                     7.871064                     7.479872
+    mlsd(infl, 3 + 0:8, gdpg)X.6 mlsd(infl, 3 + 0:8, gdpg)X.7
+300                     2.619763                     1.676215
+301                     5.391451                     4.992707
+302                     5.390349                     5.251272
+303                     7.036403                     6.809003
+    mlsd(infl, 3 + 0:8, gdpg)X.8 mlsd(infl, 3 + 0:8, gdpg)X.9
+300                     1.399770                     1.362005
+301                     4.159695                     2.619763
+302                     5.365475                     5.391451
+303                     6.221869                     5.390349
+    mlsd(infl, 3 + 0:8, gdpg)X.10 mlsd(infl, 3 + 0:8, gdpg)X.11
+300                      1.174536                      1.182066
+301                      1.676215                      1.399770
+302                      4.992707                      4.159695
+303                      5.251272                      5.365475</code></pre>
 </div>
 </div>
 <p>Let us inspect the last months of data</p>
@@ -243,32 +238,29 @@ Function lm was used for fitting</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 MIDAS regression model with "numeric" data:
-Start = 57, End = 302
+Start = 56, End = 302
 
- Formula mlsd(infl, 2, gdpg) ~ mlsd(gdpg, 1:3, gdpg) + mlsd(infl, 3 +      0:11, gdpg) 
+ Formula mlsd(infl, 2, gdpg) ~ mlsd(gdpg, 1:3, gdpg) + mlsd(infl, 3 +      0:8, gdpg) 
 
  Parameters:
             Estimate Std. Error t value Pr(&gt;|t|)    
-(Intercept) -0.03025    0.05377  -0.562  0.57433    
-gdpg1        0.02397    0.01538   1.558  0.12055    
-gdpg2        0.03639    0.01844   1.974  0.04962 *  
-gdpg3        0.04949    0.01881   2.631  0.00908 ** 
-infl1        1.28237    0.07967  16.096  &lt; 2e-16 ***
-infl2       -0.27839    0.12047  -2.311  0.02172 *  
-infl3       -0.20976    0.12017  -1.745  0.08223 .  
-infl4        0.24882    0.11378   2.187  0.02976 *  
-infl5       -0.04254    0.13146  -0.324  0.74653    
-infl6       -0.07836    0.09757  -0.803  0.42272    
-infl7        0.21885    0.10612   2.062  0.04029 *  
-infl8       -0.19394    0.11344  -1.710  0.08869 .  
-infl9        0.13788    0.08364   1.649  0.10061    
-infl10      -0.03804    0.11083  -0.343  0.73175    
-infl11      -0.15507    0.14968  -1.036  0.30130    
-infl12       0.07258    0.09422   0.770  0.44189    
+(Intercept) -0.03919    0.04991  -0.785  0.43308    
+gdpg1        0.02315    0.01616   1.432  0.15338    
+gdpg2        0.03041    0.01727   1.761  0.07951 .  
+gdpg3        0.06282    0.01817   3.456  0.00065 ***
+infl1        1.27659    0.07816  16.333  &lt; 2e-16 ***
+infl2       -0.27883    0.11661  -2.391  0.01759 *  
+infl3       -0.19871    0.11981  -1.658  0.09856 .  
+infl4        0.22796    0.11822   1.928  0.05502 .  
+infl5       -0.02450    0.13221  -0.185  0.85315    
+infl6       -0.09063    0.10396  -0.872  0.38424    
+infl7        0.22257    0.10415   2.137  0.03364 *  
+infl8       -0.13683    0.12482  -1.096  0.27411    
+infl9       -0.03304    0.06691  -0.494  0.62196    
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
- Residual standard error: 0.3502 on 230 degrees of freedom</code></pre>
+ Residual standard error: 0.352 on 234 degrees of freedom</code></pre>
 </div>
 </div>
 <p>The model suggests that the lags of GDP can be useful in forecasting the inflation.</p>
@@ -352,8 +344,132 @@ Function lm was used for fitting</code></pre>
 <p>The model fit is the same. We can check that by comparing the coefficients:</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">abs</span>(<span class="fu">coef</span>(mr)<span class="sc">-</span><span class="fu">coef</span>(mra)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in coef(mr) - coef(mra): longer object length is not a multiple of
+shorter object length</code></pre>
+</div>
 <div class="cell-output cell-output-stdout">
-<pre><code>[1] 0</code></pre>
+<pre><code>[1] 0.5507905</code></pre>
+</div>
+</div>
+</section>
+<section id="forecasting" class="level2">
+<h2 class="anchored" data-anchor-id="forecasting">Forecasting</h2>
+<p>Let us use the model for forecasting. First let us reestimate model with the data up to first quarter of the 2022.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>infl_h <span class="ot">&lt;-</span> infl[<span class="st">"/2022-03-01"</span>]</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>gdpg_h <span class="ot">&lt;-</span> gdpg[<span class="st">"/2022-01-01"</span>]</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>mrh <span class="ot">&lt;-</span> <span class="fu">update</span>(mr, <span class="at">data =</span> <span class="fu">list</span>(<span class="at">infl =</span> infl_h, <span class="at">gdpg =</span> gdpg_h))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Check whether the frequency aligning worked as expected:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>mrh<span class="sc">$</span>model[<span class="fu">nrow</span>(mrh<span class="sc">$</span>model),<span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                           y                  (Intercept) 
+                    7.479872                     1.000000 
+    mlsd(gdpg, 1:3, gdpg)X.1     mlsd(gdpg, 1:3, gdpg)X.2 
+                    3.391781                     2.008565 
+    mlsd(gdpg, 1:3, gdpg)X.3 mlsd(infl, 3 + 0:8, gdpg)X.3 
+                    3.138917                     7.036403 </code></pre>
+</div>
+</div>
+<p>To forecast the inflation value for April of 2022 (first month of the second quarter of 2022) we cannot use the <code>forecast</code> function of package midasr, because it currently does not support any transformations of left hand side variable. But we can use function <code>predict</code>, which simply fits the supplied right hand side data. So to get the forecast we pass the full data.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>pr <span class="ot">&lt;-</span> <span class="fu">predict</span>(mrh, <span class="at">newdata =</span> <span class="fu">list</span>(<span class="at">gdpg =</span> gdpg, <span class="at">infl =</span> infl))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Since the full data has additional low frequency lag, the forecast will be the last predicted value. We can check that the predictions for historic data coincide with fitted values of the model. Let us check the last four predictions.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cbind</span>(pr[<span class="fu">length</span>(pr)<span class="sc">-</span>(<span class="dv">5</span><span class="sc">:</span><span class="dv">1</span>)],mrh<span class="sc">$</span>fitted.values[<span class="fu">length</span>(mrh<span class="sc">$</span>fitted.values)<span class="sc">-</span>(<span class="dv">4</span><span class="sc">:</span><span class="dv">0</span>)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>         [,1]     [,2]
+[1,] 1.123523 1.123523
+[2,] 3.451415 3.451415
+[3,] 5.418586 5.418586
+[4,] 5.667616 5.667616
+[5,] 7.142025 7.142025</code></pre>
+</div>
+</div>
+<p>We can compare the model forecast with the actual value</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(pr[<span class="fu">length</span>(pr)], infl[<span class="st">"2022-04-01/2022-04-01"</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 8.648260 8.258629</code></pre>
+</div>
+</div>
+<p>We can see that the model forecasted higher inflation.</p>
+</section>
+<section id="forecasting-full-quarter" class="level2">
+<h2 class="anchored" data-anchor-id="forecasting-full-quarter">Forecasting full quarter</h2>
+<p>To forecast other months we need to specify a model for each month. The only change is the left hand side variable. We will fit the models with the data with last quarter removed.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>mrh_2 <span class="ot">&lt;-</span> <span class="fu">update</span>(mrh, <span class="at">formula =</span> <span class="fu">mlsd</span>(infl, <span class="dv">1</span>, gdpg)<span class="sc">~</span>.)</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>mrh_3 <span class="ot">&lt;-</span> <span class="fu">update</span>(mrh, <span class="at">formula =</span> <span class="fu">mlsd</span>(infl, <span class="dv">0</span>, gdpg)<span class="sc">~</span>.)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Let us inspect the last rows of the model matrices used to check that frequency alignment works as expected.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>mrh_2<span class="sc">$</span>model[<span class="fu">nrow</span>(mrh_2<span class="sc">$</span>model),<span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                           y                  (Intercept) 
+                    7.871064                     1.000000 
+    mlsd(gdpg, 1:3, gdpg)X.1     mlsd(gdpg, 1:3, gdpg)X.2 
+                    3.391781                     2.008565 
+    mlsd(gdpg, 1:3, gdpg)X.3 mlsd(infl, 3 + 0:8, gdpg)X.3 
+                    3.138917                     7.036403 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>mrh_3<span class="sc">$</span>model[<span class="fu">nrow</span>(mrh_3<span class="sc">$</span>model),<span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                           y                  (Intercept) 
+                    8.542456                     1.000000 
+    mlsd(gdpg, 1:3, gdpg)X.1     mlsd(gdpg, 1:3, gdpg)X.2 
+                    3.391781                     2.008565 
+    mlsd(gdpg, 1:3, gdpg)X.3 mlsd(infl, 3 + 0:8, gdpg)X.3 
+                    3.138917                     7.036403 </code></pre>
+</div>
+</div>
+<p>The right hand side remains the same and the left hand side have values for the respective second and third months of the first quarter of 2022.</p>
+<p>Let us forecast the full quarter and compare with the actual values.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>pr2 <span class="ot">&lt;-</span> <span class="fu">predict</span>(mrh_2, <span class="at">newdata =</span> <span class="fu">list</span>(<span class="at">gdpg =</span> gdpg, <span class="at">infl =</span> infl))</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>pr3 <span class="ot">&lt;-</span> <span class="fu">predict</span>(mrh_3, <span class="at">newdata =</span> <span class="fu">list</span>(<span class="at">gdpg =</span> gdpg, <span class="at">infl =</span> infl))</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>q2f <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">tail</span>(pr, <span class="at">n =</span> <span class="dv">1</span>), <span class="fu">tail</span>(pr2, <span class="at">n =</span> <span class="dv">1</span> ), <span class="fu">tail</span>(pr3, <span class="at">n =</span> <span class="dv">1</span>))</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a><span class="fu">cbind</span>(q2f, infl[<span class="st">"2022-04-01/2022-06-01"</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                q2f CPALTT01USM659N
+2022-04-01 8.648260        8.258629
+2022-05-01 8.682332        8.581512
+2022-06-01 8.595526        9.059758</code></pre>
+</div>
+</div>
+</section>
+<section id="forecasting-the-next-quarter" class="level2">
+<h2 class="anchored" data-anchor-id="forecasting-the-next-quarter">Forecasting the next quarter</h2>
+<p>Since the we use only the previous low frequency period in the specification we can forecast the inflation for the months for which we do not have the data, i.e.&nbsp;the months of July to September of 2022. To do that we only need to extend the historic data time series with NAs for the next quarter.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>infl_q3 <span class="ot">&lt;-</span> <span class="fu">xts</span>(<span class="fu">c</span>(<span class="cn">NA</span>,<span class="cn">NA</span>,<span class="cn">NA</span>), <span class="at">order.by =</span> <span class="fu">ymd</span>(<span class="st">"2022-07-01"</span>,<span class="st">"2022-08-01"</span>,<span class="st">"2022-09-01"</span>))</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>gdpg_q3 <span class="ot">&lt;-</span> <span class="fu">xts</span>(<span class="cn">NA</span>, <span class="at">order.by =</span> <span class="fu">ymd</span>(<span class="st">"2022-07-01"</span>))</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>infl_f1 <span class="ot">&lt;-</span> <span class="fu">c</span>(infl,infl_q3)</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>gdpg_f1 <span class="ot">&lt;-</span> <span class="fu">c</span>(gdpg,gdpg_q3)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Let us update the specifications with full historic data and then do the forecast.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>mrh_f2 <span class="ot">&lt;-</span> <span class="fu">update</span>(mrh_2, <span class="at">data =</span> <span class="fu">list</span>(<span class="at">infl =</span> infl, <span class="at">gdpg =</span> gdpg))</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>mrh_f3 <span class="ot">&lt;-</span> <span class="fu">update</span>(mrh_3, <span class="at">data =</span> <span class="fu">list</span>(<span class="at">infl =</span> infl, <span class="at">gdpg =</span> gdpg))</span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a>pr_jul <span class="ot">&lt;-</span> <span class="fu">predict</span>(mr, <span class="at">newdata =</span> <span class="fu">list</span>(<span class="at">infl =</span> infl_f1, <span class="at">gdpg =</span> gdpg_f1))</span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a>pr_aug <span class="ot">&lt;-</span> <span class="fu">predict</span>(mrh_f2, <span class="at">newdata =</span> <span class="fu">list</span>(<span class="at">infl =</span> infl_f1, <span class="at">gdpg =</span> gdpg_f1))</span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a>pr_sep <span class="ot">&lt;-</span> <span class="fu">predict</span>(mrh_f3, <span class="at">newdata =</span> <span class="fu">list</span>(<span class="at">infl =</span> infl_f1, <span class="at">gdpg =</span> gdpg_f1))</span>
+<span id="cb39-7"><a href="#cb39-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-8"><a href="#cb39-8" aria-hidden="true" tabindex="-1"></a>pr_q3 <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">tail</span>(pr_jul, <span class="at">n =</span> <span class="dv">1</span>), <span class="fu">tail</span>(pr_aug, <span class="at">n =</span> <span class="dv">1</span>), <span class="fu">tail</span>(pr_sep, <span class="at">n =</span> <span class="dv">1</span>))</span>
+<span id="cb39-9"><a href="#cb39-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-10"><a href="#cb39-10" aria-hidden="true" tabindex="-1"></a><span class="fu">xts</span>(pr_q3, <span class="at">order.by =</span> <span class="fu">ymd</span>(<span class="fu">c</span>(<span class="st">"2022-07-01"</span>,<span class="st">"2022-08-01"</span>,<span class="st">"2022-09-01"</span>)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>               [,1]
+2022-07-01 9.303091
+2022-08-01 9.360826
+2022-09-01 9.343012</code></pre>
 </div>
 </div>
 </section>

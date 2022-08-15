@@ -1,4 +1,4 @@
-#Reverse MIDAS examples
+# Reverse MIDAS examples
 
 The repository contains code with examples how to fit reverse MIDAS models with [midasr](https://cran.r-project.org/package=midasr) package.
 

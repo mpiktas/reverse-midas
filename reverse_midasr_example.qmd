@@ -29,6 +29,7 @@ For demonstration we will use quarterly US GDP and monthly US inflation. We fix 
 #| message: false 
 library(midasr)
 library(quantmod)
+library(lubridate)
 usqgdp <-  getSymbols("GDP",src="FRED",auto.assign=FALSE)
 infl <- getSymbols("CPALTT01USM659N",src="FRED",auto.assign=FALSE)
 
@@ -39,10 +40,18 @@ gdpg <- diff(log(usqgdp))*100
 ```
 
 
-We are fitting a model which forecasts the inflation of the first month of the quarter using previous quarter GDP growth. The frequency aligning is done using function `mlsd`, which uses date information available from `gdpg` and `infl`. These to variables are `xts` objects.
+We are fitting a model which forecasts the inflation of the first month of the quarter using previous quarter GDP growth. The frequency aligning is done using function `mlsd`, which uses date information available from `gdpg` and `infl`. These two variables are `xts` objects.
+
+In our case for the model specification we have $h=1$, $p_Y = 3$ and $p_X = 8$. This means that we are using 3 previous quarters of GDP growth and 9 months of inflation data.
+
+The package midasr uses convention that the low frequency variable is observed at the end of the low frequency period, so the high frequency values at the current low frequency period are always lagged. The first month of the quarter is then 2 high frequency lags "behind".
+
+All model specifications in midasr package assumes that the left hand side variable is observed at the low frequency period $t$. For $h=1$ the left hand side is observed at low frequency period $t+1$, so to specify the model in midasr package we need to lag all the variables by one low frequency period, or 3 high frequency periods (one quarter is equal to 3 months).
+
+Finally we arrive to the following specification:
 
 ```{r}
-mr <- midas_r(mlsd(infl,2,gdpg)~mlsd(gdpg, 1:3, gdpg)+mlsd(infl,3+0:11, gdpg), data=list(gdpg=gdpg, infl=infl), start = NULL)
+mr <- midas_r(mlsd(infl,2,gdpg)~mlsd(gdpg, 1:3, gdpg)+mlsd(infl,3+0:8, gdpg), data=list(gdpg=gdpg, infl=infl), start = NULL)
 mr
 ```
 
@@ -118,4 +127,97 @@ The model fit is the same. We can check that by comparing the coefficients:
 
 ```{r}
 sum(abs(coef(mr)-coef(mra)))
+```
+
+## Forecasting
+
+Let us use the model for forecasting. First let us reestimate model with the data up to first quarter of the 2022.
+
+
+```{r}
+infl_h <- infl["/2022-03-01"]
+gdpg_h <- gdpg["/2022-01-01"]
+
+mrh <- update(mr, data = list(infl = infl_h, gdpg = gdpg_h))
+```
+
+Check whether the frequency aligning worked as expected:
+```{r}
+mrh$model[nrow(mrh$model),1:6]
+```
+ 
+To forecast the inflation value for April of 2022 (first month of the second quarter of 2022) we cannot use the `forecast` function of package midasr, because it currently does not support any transformations of left hand side variable. But we can use function `predict`, which simply fits the supplied right hand side data. So to get the forecast we pass the full data.
+
+```{r}
+pr <- predict(mrh, newdata = list(gdpg = gdpg, infl = infl))
+```
+
+Since the full data has additional low frequency lag, the forecast will be the last predicted value. We can check that the predictions for historic data coincide with fitted values of the model. Let us check the last four predictions.
+
+```{r}
+cbind(pr[length(pr)-(5:1)],mrh$fitted.values[length(mrh$fitted.values)-(4:0)])
+```
+
+We can compare the model forecast with the actual value
+
+```{r}
+c(pr[length(pr)], infl["2022-04-01/2022-04-01"])
+```
+
+We can see that the model forecasted higher inflation. 
+
+## Forecasting full quarter
+
+To forecast other months we need to specify a model for each month. The only change is the left hand side variable. We will fit the models with the data with last quarter removed.
+
+```{r}
+mrh_2 <- update(mrh, formula = mlsd(infl, 1, gdpg)~.)
+mrh_3 <- update(mrh, formula = mlsd(infl, 0, gdpg)~.)
+```
+
+Let us inspect the last rows of the model matrices used to check that frequency alignment works as expected.
+
+```{r}
+mrh_2$model[nrow(mrh_2$model),1:6]
+mrh_3$model[nrow(mrh_3$model),1:6]
+```
+
+The right hand side remains the same and the left hand side have values for the respective second and third months of the first quarter of 2022. 
+
+Let us forecast the full quarter and compare with the actual values.
+
+```{r}
+pr2 <- predict(mrh_2, newdata = list(gdpg = gdpg, infl = infl))
+pr3 <- predict(mrh_3, newdata = list(gdpg = gdpg, infl = infl))
+
+q2f <- c(tail(pr, n = 1), tail(pr2, n = 1 ), tail(pr3, n = 1))
+cbind(q2f, infl["2022-04-01/2022-06-01"])
+```
+
+## Forecasting the next quarter
+
+Since the we use only the previous low frequency period in the specification we can forecast the inflation for the months for which we do not have the data, i.e. the months of July to September of 2022. To do that we only need to extend the historic data time series with NAs for the next quarter. 
+
+```{r}
+#| warning: false
+infl_q3 <- xts(c(NA,NA,NA), order.by = ymd("2022-07-01","2022-08-01","2022-09-01"))
+gdpg_q3 <- xts(NA, order.by = ymd("2022-07-01"))
+
+infl_f1 <- c(infl,infl_q3)
+gdpg_f1 <- c(gdpg,gdpg_q3)
+```
+
+Let us update the specifications with full historic data and then do the forecast.
+
+```{r}
+mrh_f2 <- update(mrh_2, data = list(infl = infl, gdpg = gdpg))
+mrh_f3 <- update(mrh_3, data = list(infl = infl, gdpg = gdpg))
+
+pr_jul <- predict(mr, newdata = list(infl = infl_f1, gdpg = gdpg_f1))
+pr_aug <- predict(mrh_f2, newdata = list(infl = infl_f1, gdpg = gdpg_f1))
+pr_sep <- predict(mrh_f3, newdata = list(infl = infl_f1, gdpg = gdpg_f1))
+
+pr_q3 <- c(tail(pr_jul, n = 1), tail(pr_aug, n = 1), tail(pr_sep, n = 1))
+
+xts(pr_q3, order.by = ymd(c("2022-07-01","2022-08-01","2022-09-01")))
 ```
