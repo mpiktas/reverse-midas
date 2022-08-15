@@ -120,7 +120,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>This document presents example of fitting RU-MIDAS and RR-MIDAS models as described in <a href="https://doi.org/10.1080/03610918.2018.1563148">Xu et al (2018)</a> and <a href="https://doi.org/10.1016/j.ijforecast.2018.06.004">Foroni et al (2018)</a> using <a href="https://cran.r-project.org/package=midasr">midasr</a> R package.</p>
+<p>This document presents example of fitting RU-MIDAS and RR-MIDAS models as described in <a href="https://doi.org/10.1080/03610918.2018.1563148">Xu et al (2018)</a> and <a href="https://doi.org/10.1016/j.ijforecast.2018.06.004">Foroni et al (2018)</a> using <a href="https://cran.r-project.org/package=midasr">midasr</a> R package. The source code for this document can be found in this <a href="https://github.com/mpiktas/reverse-midas">repository</a>.</p>
 <p>The RU-MIDAS and RR-MIDAS models are used to forecast high frequency variable using low frequency variable. Suppose <span class="math inline">\(y_t\)</span>, <span class="math inline">\(t\in \mathbb{Z}\)</span> is a univariate process observed at low frequency. Suppose <span class="math inline">\(x_\tau\)</span>, <span class="math inline">\(\tau=0,..,\)</span> is a high frequency variable, i.e.&nbsp;for each low frequency period <span class="math inline">\(t=t_0\)</span> we observe the variable <span class="math inline">\(x_\tau\)</span> is observed at <span class="math inline">\(m\)</span> high frequency periods: <span class="math inline">\(\tau = (t_0-1)m+1, ..., t_0m\)</span>.</p>
 <p>The model specification is the following:</p>
 <p><span class="math display">\[

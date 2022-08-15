@@ -10,7 +10,7 @@ output: html_notebook
 
 ## Introduction
 
-This document presents example of fitting RU-MIDAS and RR-MIDAS models as described in [Xu et al (2018)](https://doi.org/10.1080/03610918.2018.1563148) and [Foroni et al (2018) ](https://doi.org/10.1016/j.ijforecast.2018.06.004) using [midasr](https://cran.r-project.org/package=midasr) R package.
+This document presents example of fitting RU-MIDAS and RR-MIDAS models as described in [Xu et al (2018)](https://doi.org/10.1080/03610918.2018.1563148) and [Foroni et al (2018) ](https://doi.org/10.1016/j.ijforecast.2018.06.004) using [midasr](https://cran.r-project.org/package=midasr) R package. The source code for this document can be found in this [repository](https://github.com/mpiktas/reverse-midas).
 
 The RU-MIDAS and RR-MIDAS models are used to forecast high frequency variable using low frequency variable. Suppose $y_t$, $t\in \mathbb{Z}$ is a univariate process observed at low frequency. Suppose $x_\tau$, $\tau=0,..,$ is a high frequency variable, i.e. for each low frequency period $t=t_0$ we observe the variable $x_\tau$ is observed at $m$ high frequency periods: $\tau = (t_0-1)m+1, ..., t_0m$.
 
