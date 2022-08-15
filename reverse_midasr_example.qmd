@@ -1,0 +1,121 @@
+---
+title: "Reverse MIDAS with midasr"
+format: html
+---
+
+---
+title: "Reverse MIDAS with midasr"
+output: html_notebook
+---
+
+## Introduction
+
+This document presents example of fitting RU-MIDAS and RR-MIDAS models as described in [Xu et al (2018)](https://doi.org/10.1080/03610918.2018.1563148) and [Foroni et al (2018) ](https://doi.org/10.1016/j.ijforecast.2018.06.004) using [midasr](https://cran.r-project.org/package=midasr) R package.
+
+The RU-MIDAS and RR-MIDAS models are used to forecast high frequency variable using low frequency variable. Suppose $y_t$, $t\in \mathbb{Z}$ is a univariate process observed at low frequency. Suppose $x_\tau$, $\tau=0,..,$ is a high frequency variable, i.e. for each low frequency period $t=t_0$ we observe the variable $x_\tau$ is observed at $m$ high frequency periods: $\tau = (t_0-1)m+1, ..., t_0m$.
+
+The model specification is the following:
+
+$$
+x_{tm+h} = \mu+\sum_{j=0}^{p_Y}\mu_jy_{t-j}+\sum_{j=0}^{p_X}\beta_{j}x_{tm-j}+\varepsilon_{t}
+$$
+
+## Forecasting inflation using GDP growth
+
+For demonstration we will use quarterly US GDP and monthly US inflation. We fix the end dates, so that this document would reproduce the same results when newer data points appear in future.
+
+```{r}
+#| warning: false
+#| message: false 
+library(midasr)
+library(quantmod)
+usqgdp <-  getSymbols("GDP",src="FRED",auto.assign=FALSE)
+infl <- getSymbols("CPALTT01USM659N",src="FRED",auto.assign=FALSE)
+
+usqgdp <- usqgdp["/2022-04-01",]
+infl <- infl["/2022-06-01"]
+
+gdpg <- diff(log(usqgdp))*100
+```
+
+
+We are fitting a model which forecasts the inflation of the first month of the quarter using previous quarter GDP growth. The frequency aligning is done using function `mlsd`, which uses date information available from `gdpg` and `infl`. These to variables are `xts` objects.
+
+```{r}
+mr <- midas_r(mlsd(infl,2,gdpg)~mlsd(gdpg, 1:3, gdpg)+mlsd(infl,3+0:11, gdpg), data=list(gdpg=gdpg, infl=infl), start = NULL)
+mr
+```
+
+
+Let us inspect what time series form the part of the model:
+
+```{r}
+mr$model[nrow(mr$model)-(3:0), ]
+```
+
+Let us inspect the last months of data
+
+```{r}
+infl["2021-10-01/"]
+```
+
+Compare it with the first column of the model matrix and you will see that the values in column `y` correspond to the values of first month of the quarter, namely the last row contains value for March of 2022, the previous value corresponds to January of 2022 and so on. These values are regressed against previous 12 months of inflation.
+
+Here is the low frequency variable
+```{r}
+gdpg["2021-01-01/"]
+
+```
+
+You can see that the values in the last row of the columns `mlsd(gdpg, 1:3, gdpg)X.1` to `mlsd(gdpg, 1:3, gdpg)X.3` correspond to yearly GDP growth for first quarter of 2022 and the last two quarters of 2021.
+
+
+Let us inspect model we fit
+```{r}
+summary(mr)
+```
+
+The model suggests that the lags of GDP can be useful in forecasting the inflation.
+
+We can try to impose some lag structure on the monthly data:
+
+```{r}
+mr1 <- midas_r(mlsd(infl,2,gdpg)~mlsd(gdpg, 1:3, gdpg)+mlsd(infl,3+0:11, gdpg,nealmon), data=list(gdpg=gdpg, infl=infl), start = list(infl = c(0.1, 0.1)), method = "Nelder-Mead")
+mr2 <- update(mr1, method = "BFGS")
+mr2
+```
+
+Let us inspect the fit
+```{r}
+summary(mr2)
+```
+
+The fit is slightly worse because the restriction is not very good.  As can be seen from the coefficients: 
+```{r}
+plot_midas_coef(mr2)
+```
+
+## Frequency aliging with mls
+
+We can align frequencies manually. For that we need to align the start and beginning of the times series and padd high frequency data with NAs. The inflation data ends at June, 2022. The gdp data ends at second quarter of 2022. So in this case we have a full quarter of the high frequency data, which means that no padding is necessary.
+
+```{r}
+infl1 <- infl["1960-01-01/2022-06-01"]
+gdpgp1 <- gdpg["1960-01-01/2022-04-01"]
+
+infl2 <- ts(c(as.numeric(infl1)), start=c(1960,1), frequency = 12)
+gdpg2 <- ts(as.numeric(gdpgp1), start=c(1960,1), frequency = 4)
+```
+
+Let us fit the same model with aligned data.
+
+```{r}
+mra <- midas_r(mls(infl,2,3)~mls(gdpg, 1:3, 1)+mls(infl,3+0:11, 3), data=list(gdpg=gdpg2, infl=infl2), start = NULL)
+mra
+```
+
+The model fit is the same. We can check that by comparing the coefficients:
+
+```{r}
+sum(abs(coef(mr)-coef(mra)))
+```
